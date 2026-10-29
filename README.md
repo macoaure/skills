@@ -9,6 +9,10 @@ Personal collection of [Claude Code](https://claude.com/claude-code) skills.
   pattern. Splits a messy working-tree diff into small, specific, logical commits, picks the
   right gitmoji shortcode and matching commit type from a fixed mapping, and runs each commit
   after confirming the plan.
+- [`gitmoji-changelog`](./skills/gitmoji-changelog) — generates or updates `CHANGELOG.md` from a
+  repo's gitmoji-prefixed commit history using
+  [gitmoji-changelog](https://github.com/frinyvonnick/gitmoji-changelog), run inside a pinned
+  Docker image so no global Node/npm install is needed. Pairs naturally with `gitmoji-commits`.
 
 ## Install
 
