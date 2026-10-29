@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every skills/*/SKILL.md has required frontmatter
+        run: python3 .github/scripts/check_skill_frontmatter.py skills/*/SKILL.md
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck every script
+        run: shellcheck skills/*/scripts/*.sh
+
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Byte-compile every script
+        run: |
+          set -euo pipefail
+          for f in skills/*/scripts/*.py; do
+            python3 -m py_compile "$f"
+          done
+      - name: Smoke-test gitmoji-commits validator
+        run: |
+          set -euo pipefail
+          cd skills/gitmoji-commits
+          # a message with no body must be rejected
+          if python3 scripts/validate_commit.py ":sparkles: feat(x): add y"; then
+            echo "expected the validator to reject a bodyless commit message" >&2
+            exit 1
+          fi
+          # a well-formed message with a body must pass
+          printf ':sparkles: feat(x): add y\n\nbecause reasons.' | python3 scripts/validate_commit.py
+      - name: Smoke-test gitmoji-changelog's ensure_project_config.py
+        run: |
+          set -euo pipefail
+          # this repo already commits its own .gitmoji-changelogrc, so the
+          # script should report that and leave it untouched rather than
+          # overwrite it
+          output=$(python3 skills/gitmoji-changelog/scripts/ensure_project_config.py .)
+          echo "$output"
+          echo "$output" | grep -q "already exists, left untouched"
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build gitmoji-changelog image
+        run: docker build -t gitmoji-changelog:ci skills/gitmoji-changelog/docker
+      - name: Smoke-test the image against this repo
+        run: |
+          set -euo pipefail
+          docker run --rm -e CI=true -v "$PWD":/app gitmoji-changelog:ci \
+            init --preset generic --output /app/.ci-changelog-smoke-test.md
+          test -s .ci-changelog-smoke-test.md
+          rm -f .ci-changelog-smoke-test.md
